@@ -21,7 +21,7 @@
 
 ## Clipper Plus 是什么？
 
-Clipper Plus 基于 [Obsidian Web Clipper](https://github.com/obsidianmd/obsidian-clipper)，增加了本地视频转写流程。原有剪藏器负责普通网页、模板、阅读模式、高亮，以及保存到 Obsidian 或下载 Markdown。在视频页上，扩展可以使用从网页提取到的字幕文本，也可以让独立的 Windows 引擎用 faster-whisper 转写音频。
+Clipper Plus 基于 [Obsidian Web Clipper](https://github.com/obsidianmd/obsidian-clipper)，增加了对无字幕视频的剪藏功能。原有剪藏器负责普通网页、模板、阅读模式、高亮，以及保存到 Obsidian 或下载 Markdown。在视频页上，扩展可以使用从网页提取到的字幕文本，当视频无字幕时，独立的 Windows 引擎将自动用 faster-whisper 转写音频。
 
 本地转写需要同时安装 Chrome 扩展和 Windows 引擎。即使引擎暂时不可用，普通网页剪藏仍可使用。
 
@@ -31,24 +31,19 @@ Clipper Plus 基于 [Obsidian Web Clipper](https://github.com/obsidianmd/obsidia
 | --- | --- |
 | 网页剪藏 | 提取正文与元数据、应用模板，再保存到 Obsidian、复制或下载 Markdown。 |
 | 视频字幕 | 网页已有字幕文本时直接使用，也可选择强制转写音频。 |
-| 本地转写 | 用 yt-dlp 下载音频、FFmpeg 转换，并在本机运行 faster-whisper。 |
+| 本地转写 | 当视频无字幕时，用 yt-dlp 下载音频、FFmpeg 转换，并在本机运行 faster-whisper。 |
 | 可编辑的 Markdown | 生成含视频元数据和时间戳字幕的笔记，并在剪藏器中编辑。 |
 | 历史记录 | 从本地缓存重新打开已完成的转写，在设置页搜索和管理记录。 |
 | 阅读工具 | 保留上游的阅读模式、高亮、模板及可选的 Interpreter 功能。 |
 
-> [!NOTE]
-> 当前版本**不生成 AI 视频摘要**。上游保留的 Interpreter 是独立的可选功能；如果你配置并使用模型服务，它可能联系相应提供商。
 
 ## 开始使用
 
 ### 环境要求
 
 - Windows 10 或 11，以及 Google Chrome。
-- Python 3.11–3.13，且可使用 `py` 启动器。
-- `PATH` 中可找到 FFmpeg 和 FFprobe。
 - 至少 3 GiB 可用磁盘空间，供 Setup 检查和安装。
-- 从源码构建扩展需要 Node.js 和 npm。
-- 处理 YouTube 的 JavaScript 验证需要 Deno 2.3.0 或更新版本；缺少时，Setup 可以通过 `winget` 提示安装到当前用户。
+- 其余的环境缺失，setup会帮你补齐
 
 ### 从源码安装
 
