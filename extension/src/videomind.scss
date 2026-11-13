@@ -1,0 +1,38 @@
+/* Small video status controls embedded in the upstream popup layout. */
+#videomind-controls {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: var(--size-4-2, 0.5rem);
+	padding-top: var(--size-4-2, 0.5rem);
+	color: var(--text-muted);
+	font-size: var(--font-ui-small);
+
+	[hidden] {
+		display: none !important;
+	}
+
+	#status {
+		flex: 1 1 auto;
+	}
+
+	#progress {
+		flex: 1 0 100%;
+		width: 100%;
+		accent-color: var(--interactive-accent);
+	}
+
+	#error {
+		flex: 1 0 100%;
+		color: var(--text-error);
+		overflow-wrap: anywhere;
+	}
+
+	#confirmation {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: var(--size-4-2, 0.5rem);
+		width: 100%;
+	}
+}

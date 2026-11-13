@@ -1,0 +1,13 @@
+[build-system]
+requires = ["setuptools>=75"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "videomind-engine"
+version = "0.1.0"
+description = "Clipper Plus per-user Windows background engine"
+requires-python = ">=3.11,<3.14"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["videomind*"]

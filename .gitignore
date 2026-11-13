@@ -1,0 +1,25 @@
+__pycache__/
+*.py[cod]
+.venv/
+
+# 构建中间产物统一收在 setup/.build/ 下（venv + PyInstaller 的 work 与 dist），
+# 这样跑完安装向导仓库根目录也不会多出文件夹。
+setup/.build/
+
+*.spec
+!setup/videomind-host.spec
+
+.pytest_cache/
+.coverage
+
+# 端到端测试生成的产物
+setup/tests/e2e/output/
+
+# VideoMind generated local settings
+auth.json
+*.egg-info/
+setup/build/
+
+# Project-local Clipper Plus runtime data (never commit user settings or models)
+runtime/
+
