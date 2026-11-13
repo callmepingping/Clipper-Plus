@@ -21,7 +21,7 @@
 
 ## What is Clipper Plus?
 
-Clipper Plus extends [Obsidian Web Clipper](https://github.com/obsidianmd/obsidian-clipper) with a local video transcription workflow. The familiar clipper handles ordinary web pages, templates, Reader, highlights, and saving to Obsidian or Markdown. On a video page, it can use subtitle text extracted from the page or ask a separate Windows engine to transcribe the audio with faster-whisper.
+Clipper Plus extends [Obsidian Web Clipper](https://github.com/obsidianmd/obsidian-clipper) with an unsubtitled video transcription workflow. The familiar clipper handles ordinary web pages, templates, Reader, highlights, and saving to Obsidian or Markdown. On a video page, it can produce subtitle text extracted from the page whether the video contains subtitles or not.
 
 The Chrome extension and Windows engine are both needed for local transcription. Ordinary web clipping can still be used when the engine is unavailable.
 
@@ -30,25 +30,20 @@ The Chrome extension and Windows engine are both needed for local transcription.
 | Feature | What it does |
 | --- | --- |
 | Web clipping | Extract page content and metadata, apply templates, then save to Obsidian, copy, or download Markdown. |
-| Video subtitles | Use subtitle text already extracted by the clipper when available; choose whether to force audio transcription. |
-| Local transcription | Download audio with yt-dlp, convert it with FFmpeg, and transcribe it locally with faster-whisper. |
+| Video with subtitles | Use subtitle text already extracted by the clipper when available; choose whether to force audio transcription. |
+| Video without subtitles | Download audio with yt-dlp, convert it with FFmpeg, and transcribe it locally with faster-whisper. |
 | Editable Markdown | Produce a note with video metadata and timestamped transcript lines, then edit it in the clipper. |
 | History | Reopen completed transcriptions from the local cache, search records, and manage them in Settings. |
 | Reading tools | Keep the upstream Reader, highlighter, templates, and optional Interpreter features. |
 
-> [!NOTE]
-> This version does **not** generate an AI video summary. The upstream Interpreter is a separate, optional feature that may contact a model provider if you configure and use it.
 
 ## Get started
 
 ### Requirements
 
 - Windows 10 or 11 and Google Chrome.
-- Python 3.11–3.13 with the `py` launcher.
-- FFmpeg and FFprobe available on `PATH`.
 - At least 3 GiB of free disk space for Setup.
-- Node.js and npm to build the extension from source.
-- Deno 2.3.0 or later for YouTube's JavaScript challenges. Setup can offer a per-user installation through `winget` if Deno is missing.
+- the setup will help you complete other lacks
 
 ### Install from source
 
