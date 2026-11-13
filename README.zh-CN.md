@@ -43,26 +43,17 @@ Clipper Plus 基于 [Obsidian Web Clipper](https://github.com/obsidianmd/obsidia
 
 - Windows 10 或 11，以及 Google Chrome。
 - 至少 3 GiB 可用磁盘空间，供 Setup 检查和安装。
-- Python 3.11–3.13，并安装 Python Launcher（py）
-- FFmpeg 和 FFprobe
-- Node.js 和 npm
+- Python 3.11–3.13，以及 Python Launcher（`py`）。
+- `PATH` 中可找到 FFmpeg 和 FFprobe。
 
-### 从源码安装
+### 从 Release 安装
 
-1. 克隆仓库并构建 Chrome 扩展：
+1. 从[最新 Release](https://github.com/callmepingping/Clipper-Plus/releases/latest) 下载 **dist.zip**，解压到一个固定目录。
+2. 打开 `chrome://extensions`，启用**开发者模式**，点击**加载已解压的扩展程序**，选择解压后包含 `manifest.json` 的 `dist` 文件夹。复制 Chrome 显示的 32 位扩展 ID。
+3. 如需本地视频转写，还要从同一 Release 页面下载 **Source code (zip)**，解压到一个固定目录。运行该源码目录中的 `setup/run-setup.bat`，按提示输入扩展 ID。
+4. 打开视频页并点击 Clipper Plus 工具栏图标。可以使用网页已有字幕或选择强制转写；没有可用字幕时，本地引擎会转写音频。
 
-   ```powershell
-   git clone https://github.com/callmepingping/Clipper-Plus.git
-   cd Clipper-Plus\extension
-   npm ci
-   npm run build:chrome
-   ```
-
-2. 打开 `chrome://extensions`，启用**开发者模式**，点击**加载已解压的扩展程序**，选择 `extension/dist`。复制 Chrome 显示的 32 位扩展 ID。
-3. 从仓库运行 `setup/run-setup.bat`。Setup 会检查依赖、询问扩展 ID、创建本地 Python 环境、注册 Native Messaging Host 并启动后台引擎。按提示操作；缺少 Deno 时可能提示安装。
-4. 打开视频页，点击 Clipper Plus 工具栏图标。如果网页已有字幕，可直接使用剪藏结果，或确认强制转写；如果没有字幕，转写会自动开始。
-
-Setup 当前使用英文交互提示。需要只读检查安装状态时，可在仓库根目录运行 `py -3 setup/main.py --check`。如果更换扩展加载目录导致 Chrome 分配了新的扩展 ID，需要用新 ID 重新运行 Setup。
+安装 Release 版不需要 Node.js 或 npm。扩展 ZIP 通过 Chrome 开发者模式加载，不是 Chrome 网上应用店安装包。处理 YouTube 需要 Deno 2.3.0 或更新版本；Setup 在缺少时可以提示通过 `winget` 安装。Setup 当前使用英文提示。需要只读检查安装状态时，可在解压后的源码目录运行 `py -3 setup/main.py --check`。如果移动扩展导致 Chrome 分配了新的扩展 ID，需要用新 ID 重新运行 Setup。
 
 ## 工作原理
 

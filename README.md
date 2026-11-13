@@ -43,26 +43,17 @@ The Chrome extension and Windows engine are both needed for local transcription.
 
 - Windows 10 or 11 and Google Chrome.
 - At least 3 GiB of free disk space for Setup.
-- Python 3.11–3.13 and Python Launcher（py）
-- FFmpeg and FFprobe
-- Node.js and npm
-  
-### Install from source
+- Python 3.11–3.13 and the Python Launcher (`py`).
+- FFmpeg and FFprobe available on `PATH`.
 
-1. Clone the repository and build the Chrome extension:
+### Install from a Release
 
-   ```powershell
-   git clone https://github.com/callmepingping/Clipper-Plus.git
-   cd Clipper-Plus\extension
-   npm ci
-   npm run build:chrome
-   ```
+1. Download **dist.zip** from the [latest Release](https://github.com/callmepingping/Clipper-Plus/releases/latest) and extract it to a folder you will keep.
+2. Open `chrome://extensions`, turn on **Developer mode**, and choose **Load unpacked**. Select the extracted `dist` folder containing `manifest.json`. Copy the 32-character extension ID shown by Chrome.
+3. For local video transcription, download **Source code (zip)** from the same Release page and extract it to a folder you will keep. Run `setup/run-setup.bat` from that source folder, and enter the extension ID when prompted.
+4. Open a video page and click the Clipper Plus toolbar icon. Use available page subtitles or choose forced transcription; when no subtitles are available, the local engine transcribes the audio.
 
-2. In `chrome://extensions`, turn on **Developer mode**, choose **Load unpacked**, and select `extension/dist`. Copy the extension's 32-character ID shown by Chrome.
-3. Run `setup/run-setup.bat` from the repository. Setup checks prerequisites, asks for the Chrome extension ID, creates the local Python environment, registers the Native Messaging host, and starts the background engine. Follow its prompts; it may offer to install Deno.
-4. Open a video page and click the Clipper Plus toolbar icon. If the page already provides subtitle text, use the clipper result or confirm forced audio transcription. Otherwise, transcription starts automatically.
-
-Setup is interactive and currently uses English prompts. Run `py -3 setup/main.py --check` from the repository root for read-only installation diagnostics. If Chrome assigns a different extension ID after reloading from another folder, run Setup again with the new ID.
+Installing from the Release does not require Node.js or npm. The extension ZIP is loaded through Chrome's Developer mode; it is not a Chrome Web Store installer. Setup requires Deno 2.3.0 or later for YouTube and can offer to install it through `winget` if missing. Setup uses English prompts. Run `py -3 setup/main.py --check` from the extracted source folder for read-only diagnostics. If Chrome assigns a different extension ID after you move the extension, run Setup again with the new ID.
 
 ## How it works
 
