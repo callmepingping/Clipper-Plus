@@ -43,7 +43,9 @@ Clipper Plus 基于 [Obsidian Web Clipper](https://github.com/obsidianmd/obsidia
 
 - Windows 10 或 11，以及 Google Chrome。
 - 至少 3 GiB 可用磁盘空间，供 Setup 检查和安装。
-- 其余的环境缺失，setup会帮你补齐
+- Python 3.11–3.13，并安装 Python Launcher（py）
+- FFmpeg 和 FFprobe
+- Node.js 和 npm
 
 ### 从源码安装
 
