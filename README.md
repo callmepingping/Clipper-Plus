@@ -43,8 +43,10 @@ The Chrome extension and Windows engine are both needed for local transcription.
 
 - Windows 10 or 11 and Google Chrome.
 - At least 3 GiB of free disk space for Setup.
-- the setup will help you complete other lacks
-
+- Python 3.11–3.13 and Python Launcher（py）
+- FFmpeg and FFprobe
+- Node.js and npm
+  
 ### Install from source
 
 1. Clone the repository and build the Chrome extension:
