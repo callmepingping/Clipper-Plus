@@ -36,6 +36,15 @@ def ask(label, default=""):
     return response or default
 
 
+def select_extension_id(config=None, supplied=None):
+    current = (config or {}).get("service", {}).get("extension_id", "")
+    extension_id = supplied if supplied is not None else ask(
+        "Chrome Extension ID (copy the ID of the currently loaded Clipper Plus from chrome://extensions)", current)
+    if not re.fullmatch(r"[a-p]{32}", extension_id):
+        raise AppError("INVALID_CONFIGURATION", "Copy the 32-character extension ID from chrome://extensions and rerun Setup.")
+    return extension_id
+
+
 def find_deno():
     candidates = [shutil.which("deno")]
     profile = Path(os.environ.get("USERPROFILE", Path.home()))
@@ -235,7 +244,7 @@ def _set_login_startup(config, paths, pythonw):
         print("Automatic startup is disabled. The Native Messaging Host can start the Engine when Chrome next requests it.")
 
 
-def install():
+def install(extension_id_override=None):
     paths = runtime_paths()
     system = inspect_system(paths.project_root)
     state = detect_installation(paths)
@@ -254,9 +263,7 @@ def install():
     if config_source.is_file():
         config = load_config(config_source)
     if config is None:
-        extension_id = ask("Chrome Extension ID (32 lowercase letters a-p)")
-        if not re.fullmatch(r"[a-p]{32}", extension_id):
-            raise AppError("INVALID_CONFIGURATION", "Copy the 32-character extension ID from chrome://extensions and rerun Setup.")
+        extension_id = select_extension_id(supplied=extension_id_override)
         config = {"version": 2, "storage": {"original_dir": str(paths.originals)},
                   "whisper": {"model": "base", "device": "cpu", "compute_type": "int8", "language": "auto"},
                   "service": {"pipe_name": f"VideoMind-{current_sid()}", "extension_id": extension_id}}
@@ -267,11 +274,7 @@ def install():
         config.pop("ai", None)
         config.setdefault("storage", {}).pop("summary_dir", None)
         config.setdefault("service", {})
-        if not config["service"].get("extension_id"):
-            extension_id = ask("Chrome Extension ID (32 lowercase letters a-p)")
-            if not re.fullmatch(r"[a-p]{32}", extension_id):
-                raise AppError("INVALID_CONFIGURATION", "Copy the 32-character extension ID from chrome://extensions and rerun Setup.")
-            config["service"]["extension_id"] = extension_id
+        config["service"]["extension_id"] = select_extension_id(config, extension_id_override)
     legacy_original_dir = config.get("storage", {}).get("original_dir")
 
     print(f"Project Runtime: {paths.root}")
@@ -344,12 +347,13 @@ def main(argv=None):
     parser = argparse.ArgumentParser(description="Clipper Plus Setup (English only)")
     parser.add_argument("--check", action="store_true", help="Read-only environment diagnostics")
     parser.add_argument("--install", action="store_true", help="Initialize or repair the local installation")
+    parser.add_argument("--extension-id", help="Use the current Chrome extension ID during installation or repair")
     args = parser.parse_args(argv)
     try:
         if args.check:
             return 0 if check_environment() else 1
         if args.install:
-            return install()
+            return install(args.extension_id)
         parser.print_help()
         print("No changes were made. Run with --check to diagnose or --install to initialize or repair.")
         return 0

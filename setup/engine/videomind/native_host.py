@@ -1,6 +1,7 @@
 """Short-lived Chrome bridge; it never owns download/transcription work."""
 import argparse
 import os
+from pathlib import Path
 import struct
 import sys
 
@@ -64,6 +65,16 @@ def bridge(input_stream, output_stream, handler=call_engine):
             return
 
 
+def configure_frozen_installation(executable):
+    # The one-file host extracts Python modules into a temporary directory.
+    # Its installed executable stays in <project>/runtime/host/.
+    executable = Path(executable).resolve()
+    os.environ["CLIPPER_PLUS_PROJECT_ROOT"] = str(executable.parents[2])
+    location = executable.with_name("config-location.txt")
+    if location.is_file():
+        os.environ["VIDEOMIND_CONFIG"] = location.read_text(encoding="utf-8").strip()
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description="Clipper Plus Chrome Native Messaging bridge")
     parser.add_argument("origin", help="Chrome extension origin supplied by Chrome")
@@ -73,10 +84,7 @@ def main(argv=None):
     if args.config:
         os.environ["VIDEOMIND_CONFIG"] = args.config
     elif getattr(sys, "frozen", False):
-        from pathlib import Path
-        location = Path(sys.executable).with_name("config-location.txt")
-        if location.is_file():
-            os.environ["VIDEOMIND_CONFIG"] = location.read_text(encoding="utf-8").strip()
+        configure_frozen_installation(sys.executable)
     if os.name == "nt":
         import msvcrt
         msvcrt.setmode(sys.stdin.fileno(), os.O_BINARY)

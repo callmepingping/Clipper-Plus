@@ -78,6 +78,22 @@ class InstallationDetectionTests(unittest.TestCase):
         self.assertEqual(setup.detect_installation(self.paths), "Partial Installation")
 
 
+class ExtensionIdSelectionTests(unittest.TestCase):
+    def test_existing_installation_can_replace_extension_id(self):
+        with patch.object(setup, "ask", return_value="b" * 32) as ask:
+            selected = setup.select_extension_id(valid_config())
+        self.assertEqual(selected, "b" * 32)
+        self.assertEqual(ask.call_args.args[1], "a" * 32)
+
+    def test_explicit_extension_id_skips_prompt_and_is_validated(self):
+        with patch.object(setup, "ask") as ask:
+            self.assertEqual(setup.select_extension_id(valid_config(), "b" * 32), "b" * 32)
+            with self.assertRaises(Exception) as raised:
+                setup.select_extension_id(valid_config(), "invalid")
+        self.assertEqual(getattr(raised.exception, "code", None), "INVALID_CONFIGURATION")
+        ask.assert_not_called()
+
+
 class SchedulerTests(unittest.TestCase):
     def test_task_query_decodes_unicode_boms_utf8_and_cp936_without_changing_paths(self):
         with tempfile.TemporaryDirectory() as root:

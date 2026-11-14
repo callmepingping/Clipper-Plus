@@ -8,10 +8,24 @@ import sys
 import tempfile
 import unittest
 
-from videomind.native_host import read_message, write_message
+from videomind.native_host import configure_frozen_installation, read_message, write_message
 
 
 class NativeEntryTests(unittest.TestCase):
+    def test_frozen_host_uses_installed_project_path(self):
+        with tempfile.TemporaryDirectory() as root:
+            project = Path(root) / "project"
+            host = project / "runtime" / "host"
+            host.mkdir(parents=True)
+            executable = host / "videomind-host.exe"
+            configuration = project / "runtime" / "auth.json"
+            (host / "config-location.txt").write_text(str(configuration), encoding="utf-8")
+            from unittest.mock import patch
+            with patch.dict(os.environ, {}, clear=True):
+                configure_frozen_installation(executable)
+                self.assertEqual(os.environ["CLIPPER_PLUS_PROJECT_ROOT"], str(project.resolve()))
+                self.assertEqual(os.environ["VIDEOMIND_CONFIG"], str(configuration))
+
     def invoke(self, configuration, origin):
         with tempfile.TemporaryDirectory() as root:
             path = Path(root) / "auth.json"
