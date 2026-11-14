@@ -7,7 +7,7 @@
 </p>
 
 <h1 align="center">Clipper Plus</h1>
-<p align="center"><strong>Clip web pages and turn video speech into editable Markdown.</strong></p>
+<p align="center"><strong>Clip web pages and turn any video speech into editable Markdown.</strong></p>
 <p align="center">
   <img src="https://img.shields.io/badge/Chrome-Manifest%20V3-7048E8?style=flat-square" alt="Chrome Manifest V3">
   <img src="https://img.shields.io/badge/Local%20engine-Windows%2010%2F11-7048E8?style=flat-square" alt="Windows 10 and 11 local engine">
