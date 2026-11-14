@@ -49,11 +49,10 @@ Clipper Plus 基于 [Obsidian Web Clipper](https://github.com/obsidianmd/obsidia
 ### 从 Release 安装
 
 1. 从[最新 Release](https://github.com/callmepingping/Clipper-Plus/releases/latest) 下载 **dist.zip**，解压到一个固定目录。
-2. 打开 `chrome://extensions`，启用**开发者模式**，点击**加载已解压的扩展程序**，选择解压后包含 `manifest.json` 的 `dist` 文件夹。复制 Chrome 显示的 32 位扩展 ID。
-3. 如需本地视频转写，还要从同一 Release 页面下载 **Source code (zip)**，解压到一个固定目录。运行该源码目录中的 `setup/run-setup.bat`，按提示输入 `chrome://extensions` 中**当前加载的 Clipper Plus** 的 ID。如果此前加载过其他副本，请重新复制当前 ID。
-4. 打开视频页并点击 Clipper Plus 工具栏图标。可以使用网页已有字幕或选择强制转写；没有可用字幕时，本地引擎会转写音频。
+2. 打开 `chrome://extensions`，启用**开发者模式**，点击**加载已解压的扩展程序**，选择解压后的 `dist` 文件夹。复制 Chrome 显示的 32 位扩展 ID。
+3. 从同一 Release 页面下载 **Source code (zip)**，解压到一个固定目录。运行该源码目录中的 `setup/run-setup.bat`，根据指引设置
 
-安装 Release 版不需要 Node.js 或 npm。扩展 ZIP 通过 Chrome 开发者模式加载，不是 Chrome 网上应用店安装包。处理 YouTube 需要 Deno 2.3.0 或更新版本；Setup 在缺少时可以提示通过 `winget` 安装。Setup 当前使用英文提示。需要只读检查安装状态时，可在解压后的源码目录运行 `py -3 setup/main.py --check`。如果移动扩展导致 Chrome 分配了新的扩展 ID，重新运行 Setup 并输入新 ID。修复时也可在解压后的源码目录运行 `py -3 setup/main.py --install --extension-id 当前扩展ID`。
+如果移动扩展导致 Chrome 分配了新的扩展 ID，重新运行 Setup 并输入新 ID。修复时也可在解压后的源码目录运行 `py -3 setup/main.py --install --extension-id 当前扩展ID`。
 
 ## 工作原理
 
@@ -63,12 +62,12 @@ Clipper Plus 基于 [Obsidian Web Clipper](https://github.com/obsidianmd/obsidia
                   └──> Native Messaging Host
                                │
                                └──> Windows 后台引擎
-                                      ├── yt-dlp + FFmpeg：音频
+                                      ├── yt-dlp + FFmpeg：音频下载
                                       ├── faster-whisper：语音识别
                                       └── 本地 Markdown 缓存与历史记录
 ```
 
-Native Messaging Host 通过当前用户的 Windows 命名管道，把短请求交给独立后台引擎。关闭弹窗或 Chrome 不会停止正在运行的引擎任务。任务进度只在引擎运行期间保留；已完成的 Markdown 和历史记录存放在本地 `runtime/` 目录。Setup 会创建该目录，Git 已将它排除。
+Native Messaging Host 通过当前用户的 Windows 命名管道，把短请求交给独立后台引擎。关闭弹窗或 Chrome 不会停止正在运行的引擎任务。任务进度只在引擎运行期间保留；已完成的 Markdown 和历史记录存放在本地 `runtime/` 目录。Setup 会创建该目录。
 
 ### 数据与当前限制
 
@@ -103,7 +102,7 @@ cd setup
 .\.build\venv\Scripts\python.exe -m unittest discover -s tests -p "test_*.py" -q
 ```
 
-欢迎通过 [GitHub Issues](https://github.com/callmepingping/Clipper-Plus/issues) 反馈问题或参与改进。请说明操作系统、浏览器版本、复现步骤，以及扩展显示的安全错误代码；不要上传私有视频内容、Cookie 或本地配置文件。
+欢迎通过 [GitHub Issues](https://github.com/callmepingping/Clipper-Plus/issues) 反馈问题或参与改进。
 
 ## 来源与许可证
 
