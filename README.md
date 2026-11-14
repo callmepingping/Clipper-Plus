@@ -51,7 +51,12 @@ The Chrome extension and Windows engine are both needed for local transcription.
 1. Download **dist.zip** from the [latest Release](https://github.com/callmepingping/Clipper-Plus/releases/latest) and extract it to a folder you will keep.
 2. Open `chrome://extensions`, turn on **Developer mode**, and choose **Load unpacked**. Select the extracted `dist` folder. Copy the 32-character extension ID shown by Chrome.
 3. download **Source code (zip)** from the same Release page and extract it to a folder you will keep. Run `setup/run-setup.bat` from that source folder, and follow the instructions to set up.
+   
+If moving the extension causes Chrome to assign a new extension ID, rerun Setup with the new ID. You can also repair the installation from the extracted source directory using:
 
+```powershell
+py -3 setup/main.py --install --extension-id YOUR_EXTENSION_ID
+```
    
 ## How it works
 
