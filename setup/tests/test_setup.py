@@ -1,5 +1,7 @@
 """Setup orchestration tests use isolated paths and never touch a real install."""
 import importlib.util
+import hashlib
+import io
 import json
 from pathlib import Path
 import subprocess
@@ -9,6 +11,7 @@ import types
 import unittest
 from unittest.mock import MagicMock, patch
 import xml.etree.ElementTree as ET
+import zipfile
 
 from videomind.config import legacy_config_path
 from environment import install_requirements
@@ -226,6 +229,79 @@ class EnvironmentTests(unittest.TestCase):
             command = commands[0]
             cache_index = command.index("--cache-dir")
             self.assertEqual(Path(command[cache_index + 1]), Path(root) / "runtime" / "cache" / "pip")
+
+
+class DenoBootstrapTests(unittest.TestCase):
+    def test_missing_winget_uses_direct_deno_fallback(self):
+        runtime = ("C:/Clipper/runtime/tools/deno/deno.exe", "2.9.8")
+        with patch.object(setup, "find_winget", return_value=None), \
+                patch.object(setup, "bootstrap_winget", return_value=None), \
+                patch.object(setup, "install_deno_direct", return_value=runtime) as direct:
+            self.assertEqual(setup.install_deno(), runtime)
+        direct.assert_called_once_with()
+
+    def test_existing_app_installer_registration_avoids_bundle_download(self):
+        with patch.object(setup, "find_winget", side_effect=[None, "C:/WindowsApps/winget.exe"]), \
+                patch.object(setup, "_run_powershell", return_value=True), \
+                patch.object(setup, "_download_file") as download:
+            self.assertEqual(setup.bootstrap_winget(), "C:/WindowsApps/winget.exe")
+        download.assert_not_called()
+
+    def test_missing_app_installer_downloads_microsoft_bundle(self):
+        with tempfile.TemporaryDirectory() as root:
+            paths = setup.runtime_paths(root)
+
+            def download(_url, destination, _limit):
+                Path(destination).write_bytes(b"signed bundle placeholder")
+
+            with patch.object(setup, "runtime_paths", return_value=paths), \
+                    patch.object(setup, "find_winget", side_effect=[None, None, "C:/WindowsApps/winget.exe"]), \
+                    patch.object(setup, "_run_powershell", return_value=True) as powershell, \
+                    patch.object(setup, "_download_file", side_effect=download) as fetch:
+                self.assertEqual(setup.bootstrap_winget(), "C:/WindowsApps/winget.exe")
+            self.assertEqual(fetch.call_args.args[0], "https://aka.ms/getwinget")
+            self.assertEqual(powershell.call_count, 2)
+
+    def test_direct_install_verifies_checksum_before_publishing_executable(self):
+        with tempfile.TemporaryDirectory() as root:
+            paths = setup.runtime_paths(root)
+            stream = io.BytesIO()
+            with zipfile.ZipFile(stream, "w") as archive:
+                archive.writestr("deno.exe", b"test Deno executable")
+            zip_bytes = stream.getvalue()
+            digest = hashlib.sha256(zip_bytes).hexdigest()
+
+            def download(url, destination, _limit):
+                if url.endswith(".sha256sum"):
+                    Path(destination).write_text(f"Algorithm : SHA256\nHash : {digest}\n", encoding="utf-8")
+                else:
+                    Path(destination).write_bytes(zip_bytes)
+
+            with patch.object(setup, "runtime_paths", return_value=paths), \
+                    patch.object(setup, "_download_file", side_effect=download), \
+                    patch.object(setup.platform, "machine", return_value="AMD64"), \
+                    patch.object(setup, "_deno_version", side_effect=lambda p: (str(p), "2.9.8")):
+                result = setup.install_deno_direct()
+            self.assertEqual(result[0], str(paths.root / "tools" / "deno" / "deno.exe"))
+            self.assertEqual(Path(result[0]).read_bytes(), b"test Deno executable")
+
+    def test_direct_install_rejects_bad_checksum_without_publishing_executable(self):
+        with tempfile.TemporaryDirectory() as root:
+            paths = setup.runtime_paths(root)
+
+            def download(url, destination, _limit):
+                if url.endswith(".sha256sum"):
+                    Path(destination).write_text("0" * 64, encoding="utf-8")
+                else:
+                    Path(destination).write_bytes(b"invalid archive")
+
+            with patch.object(setup, "runtime_paths", return_value=paths), \
+                    patch.object(setup, "_download_file", side_effect=download), \
+                    patch.object(setup.platform, "machine", return_value="AMD64"):
+                with self.assertRaises(Exception) as raised:
+                    setup.install_deno_direct()
+            self.assertEqual(getattr(raised.exception, "code", None), "DENO_INSTALL_FAILED")
+            self.assertFalse((paths.root / "tools" / "deno" / "deno.exe").exists())
 
 
 if __name__ == "__main__":

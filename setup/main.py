@@ -1,13 +1,19 @@
 """English-only setup orchestrator; runtime, environment and Windows tasks are separate subsystems."""
 import argparse
+import base64
+import hashlib
 import importlib.util
 import json
 import os
 from pathlib import Path
+import platform
 import re
 import shutil
 import subprocess
 import sys
+import tempfile
+from urllib.request import Request, urlopen
+import zipfile
 
 SETUP = Path(__file__).resolve().parent
 sys.path.insert(0, str(SETUP / "engine"))
@@ -45,8 +51,25 @@ def select_extension_id(config=None, supplied=None):
     return extension_id
 
 
+def _deno_version(candidate):
+    if not candidate or not Path(candidate).is_file():
+        return None
+    try:
+        result = subprocess.run([str(candidate), "--version"], capture_output=True, text=True,
+                                timeout=10, check=False,
+                                creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+        match = re.search(r"(?m)^deno\s+(\d+)\.(\d+)\.(\d+)", result.stdout)
+        if result.returncode == 0 and match:
+            version_tuple = tuple(map(int, match.groups()))
+            if version_tuple >= (2, 3, 0):
+                return str(Path(candidate).resolve()), ".".join(map(str, version_tuple))
+    except (OSError, subprocess.TimeoutExpired):
+        pass
+    return None
+
+
 def find_deno():
-    candidates = [shutil.which("deno")]
+    candidates = [str(runtime_paths().root / "tools" / "deno" / "deno.exe"), shutil.which("deno")]
     profile = Path(os.environ.get("USERPROFILE", Path.home()))
     local = Path(os.environ.get("LOCALAPPDATA", profile / "AppData" / "Local"))
     candidates.extend([str(profile / ".deno" / "bin" / "deno.exe"),
@@ -59,36 +82,142 @@ def find_deno():
         pass
     seen = set()
     for candidate in candidates:
-        if not candidate or candidate.casefold() in seen or not Path(candidate).is_file():
+        if not candidate or candidate.casefold() in seen:
             continue
         seen.add(candidate.casefold())
-        try:
-            result = subprocess.run([candidate, "--version"], capture_output=True, text=True,
-                                    timeout=10, check=False,
-                                    creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
-            match = re.search(r"(?m)^deno\s+(\d+)\.(\d+)\.(\d+)", result.stdout)
-            if result.returncode == 0 and match:
-                version_tuple = tuple(map(int, match.groups()))
-                if version_tuple >= (2, 3, 0):
-                    return str(Path(candidate).resolve()), ".".join(map(str, version_tuple))
-        except (OSError, subprocess.TimeoutExpired):
-            continue
+        runtime = _deno_version(candidate)
+        if runtime:
+            return runtime
     return None
 
 
-def install_deno():
-    winget = shutil.which("winget")
-    if not winget:
-        raise AppError("DENO_INSTALL_UNAVAILABLE", "Install Deno 2.3.0 or later from https://deno.com/install, then rerun Setup.")
-    print("Installing Deno from the official DenoLand.Deno Windows package for the current user.")
-    result = subprocess.run([winget, "install", "--id", "DenoLand.Deno", "--exact", "--scope", "user",
-                             "--accept-package-agreements", "--accept-source-agreements"], check=False)
-    if result.returncode:
-        raise AppError("DENO_INSTALL_FAILED", "Automatic Deno installation failed. Install Deno from https://deno.com/install and retry.")
-    runtime = find_deno()
+def find_winget():
+    local = Path(os.environ.get("LOCALAPPDATA", Path.home() / "AppData" / "Local"))
+    for candidate in (shutil.which("winget"), str(local / "Microsoft" / "WindowsApps" / "winget.exe")):
+        if not candidate or not Path(candidate).is_file():
+            continue
+        try:
+            result = subprocess.run([candidate, "--version"], capture_output=True, timeout=15, check=False,
+                                    creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+            if result.returncode == 0:
+                return str(Path(candidate).resolve())
+        except (OSError, subprocess.TimeoutExpired):
+            pass
+    return None
+
+
+def _download_file(url, destination, limit):
+    request = Request(url, headers={"User-Agent": "Clipper-Plus-Setup"})
+    with urlopen(request, timeout=45) as response, Path(destination).open("wb") as output:
+        if not response.url.startswith("https://"):
+            raise ValueError("The download did not use HTTPS.")
+        size = 0
+        while block := response.read(1024 * 1024):
+            size += len(block)
+            if size > limit:
+                raise ValueError("The download exceeded its size limit.")
+            output.write(block)
+        if size == 0:
+            raise ValueError("The download was empty.")
+
+
+def _run_powershell(script, timeout=180):
+    encoded = base64.b64encode(script.encode("utf-16le")).decode("ascii")
+    try:
+        result = subprocess.run(["powershell.exe", "-NoProfile", "-NonInteractive", "-EncodedCommand", encoded],
+                                capture_output=True, timeout=timeout, check=False)
+        return result.returncode == 0
+    except (OSError, subprocess.TimeoutExpired):
+        return False
+
+
+def bootstrap_winget():
+    """Try Microsoft's per-user App Installer registration, then its signed bundle."""
+    existing = find_winget()
+    if existing:
+        return existing
+    print("WinGet is missing. Checking the Windows App Installer registration.")
+    _run_powershell("$ErrorActionPreference='Stop'; Add-AppxPackage -RegisterByFamilyName "
+                    "-MainPackage Microsoft.DesktopAppInstaller_8wekyb3d8bbwe")
+    winget = find_winget()
+    if winget:
+        return winget
+    paths = ensure_runtime(runtime_paths())
+    print("Downloading the signed Microsoft App Installer package for WinGet.")
+    try:
+        with tempfile.TemporaryDirectory(prefix="winget-", dir=paths.temp) as directory:
+            bundle = Path(directory) / "Microsoft.DesktopAppInstaller.msixbundle"
+            _download_file("https://aka.ms/getwinget", bundle, 512 * 1024 * 1024)
+            quoted = "'" + str(bundle).replace("'", "''") + "'"
+            _run_powershell("$ErrorActionPreference='Stop'; Add-AppxPackage -Path " + quoted,
+                            timeout=600)
+    except (OSError, ValueError):
+        pass
+    return find_winget()
+
+
+def install_deno_direct():
+    """Install the official, SHA-256-verified Deno binary into project Runtime."""
+    architecture = platform.machine().lower()
+    target = "aarch64" if architecture in {"arm64", "aarch64"} else "x86_64" if architecture in {"amd64", "x86_64"} else None
+    if target is None:
+        raise AppError("DENO_INSTALL_FAILED", "This Windows CPU architecture is not supported by the automatic Deno installer.")
+    asset = f"deno-{target}-pc-windows-msvc.zip"
+    base = "https://github.com/denoland/deno/releases/latest/download/"
+    paths = ensure_runtime(runtime_paths())
+    destination = paths.root / "tools" / "deno" / "deno.exe"
+    print("Downloading Deno directly from its official Release and verifying SHA-256.")
+    try:
+        with tempfile.TemporaryDirectory(prefix="deno-", dir=paths.temp) as directory:
+            temporary = Path(directory)
+            checksum = temporary / (asset + ".sha256sum")
+            archive = temporary / asset
+            _download_file(base + asset + ".sha256sum", checksum, 16 * 1024)
+            hashes = re.findall(r"(?i)\b[a-f0-9]{64}\b", checksum.read_text(encoding="utf-8-sig"))
+            if len(hashes) != 1:
+                raise ValueError("The Deno checksum was invalid.")
+            _download_file(base + asset, archive, 512 * 1024 * 1024)
+            with archive.open("rb") as stream:
+                digest = hashlib.file_digest(stream, "sha256").hexdigest()
+            if digest.casefold() != hashes[0].casefold():
+                raise ValueError("The Deno download failed SHA-256 verification.")
+            with zipfile.ZipFile(archive) as package:
+                files = [item for item in package.infolist() if not item.is_dir()]
+                if len(files) != 1 or files[0].filename != "deno.exe" or files[0].file_size > 768 * 1024 * 1024:
+                    raise ValueError("The Deno archive did not contain the expected executable.")
+                staged = temporary / "deno.exe"
+                with package.open(files[0]) as source, staged.open("wb") as output:
+                    shutil.copyfileobj(source, output)
+            runtime = _deno_version(staged)
+            if not runtime:
+                raise ValueError("The downloaded Deno executable did not pass its version check.")
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            os.replace(staged, destination)
+    except (OSError, ValueError, zipfile.BadZipFile, UnicodeError):
+        raise AppError("DENO_INSTALL_FAILED", "Automatic Deno download failed. Check the network connection and rerun Setup.") from None
+    runtime = _deno_version(destination)
     if not runtime:
-        raise AppError("DENO_INSTALL_FAILED", "Deno was installed but could not be verified. Restart Setup and retry.")
+        raise AppError("DENO_INSTALL_FAILED", "Deno was downloaded but could not be verified. Rerun Setup.")
     return runtime
+
+
+def install_deno():
+    winget = find_winget() or bootstrap_winget()
+    if winget:
+        print("Installing Deno with WinGet for the current Windows user.")
+        try:
+            result = subprocess.run([winget, "install", "--id", "DenoLand.Deno", "--exact", "--scope", "user",
+                                     "--source", "winget", "--silent", "--disable-interactivity",
+                                     "--accept-package-agreements", "--accept-source-agreements"],
+                                    timeout=600, check=False)
+            if result.returncode == 0:
+                runtime = find_deno()
+                if runtime:
+                    return runtime
+        except (OSError, subprocess.TimeoutExpired):
+            pass
+        print("WinGet could not install a verified Deno runtime; using the official Deno download.")
+    return install_deno_direct()
 
 
 def verify_ytdlp_install(python, deno_path):
@@ -306,9 +435,7 @@ def install(extension_id_override=None):
     python, pythonw = environment["python"], environment["pythonw"]
     deno = _valid_deno(config)
     if not deno:
-        print("Deno 2.3.0 or later is required for YouTube JavaScript challenges.")
-        if ask("Install Deno for the current Windows user with winget? Type yes", "no").lower() != "yes":
-            raise AppError("DENO_REQUIRED", "Install Deno 2.3.0 or later, then rerun Setup.")
+        print("Deno 2.3.0 or later is missing. Setup will install it automatically.")
         deno = install_deno()
     config["service"]["js_runtime_path"] = deno[0]
 
