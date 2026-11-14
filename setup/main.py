@@ -42,10 +42,67 @@ def ask(label, default=""):
     return response or default
 
 
+def discover_chrome_extensions(user_data=None):
+    """Find unpacked Clipper Plus copies without reading Chrome page or extension data."""
+    local = Path(os.environ.get("LOCALAPPDATA", Path.home() / "AppData" / "Local"))
+    profiles = Path(user_data) if user_data else local / "Google" / "Chrome" / "User Data"
+    found = {}
+    try:
+        preference_files = sorted(profiles.glob("*/Secure Preferences"))
+    except OSError:
+        return found
+    for preferences in preference_files:
+        try:
+            if preferences.stat().st_size > 64 * 1024 * 1024:
+                continue
+            settings = json.loads(preferences.read_text(encoding="utf-8")).get("extensions", {}).get("settings", {})
+        except (OSError, ValueError, AttributeError):
+            continue
+        if not isinstance(settings, dict):
+            continue
+        for extension_id, info in settings.items():
+            if not re.fullmatch(r"[a-p]{32}", extension_id) or not isinstance(info, dict):
+                continue
+            if info.get("location") != 4 or info.get("disable_reasons"):
+                continue
+            path = info.get("path")
+            if not isinstance(path, str) or not path:
+                continue
+            folder = Path(path)
+            if not folder.is_absolute():
+                continue
+            try:
+                manifest = json.loads((folder / "manifest.json").read_text(encoding="utf-8-sig"))
+            except (OSError, ValueError, AttributeError):
+                continue
+            if (isinstance(manifest, dict) and manifest.get("name") == "Clipper Plus"
+                    and manifest.get("manifest_version") == 3
+                    and isinstance(manifest.get("permissions"), list)
+                    and "nativeMessaging" in manifest["permissions"]):
+                found[extension_id] = folder
+    return found
+
+
 def select_extension_id(config=None, supplied=None):
     current = (config or {}).get("service", {}).get("extension_id", "")
-    extension_id = supplied if supplied is not None else ask(
-        "Chrome Extension ID (copy the ID of the currently loaded Clipper Plus from chrome://extensions)", current)
+    if supplied is None:
+        detected = discover_chrome_extensions()
+        if len(detected) == 1:
+            default = next(iter(detected))
+            print(f"Detected Clipper Plus Chrome Extension ID: {default}")
+        else:
+            default = ""
+            if detected:
+                print("Multiple Clipper Plus extensions were found. Choose the ID shown for the copy you use in chrome://extensions:")
+                for identifier, folder in sorted(detected.items()):
+                    print(f"  {identifier}  {folder}")
+            elif current:
+                print("The saved Chrome Extension ID could not be verified. Copy the current ID from chrome://extensions.")
+        extension_id = ask("Current Clipper Plus Chrome Extension ID (32 lowercase letters a-p)", default)
+        if detected and extension_id not in detected:
+            raise AppError("INVALID_CONFIGURATION", "The entered ID does not match a loaded Clipper Plus extension in Chrome. Check chrome://extensions or use --extension-id for another Chrome profile.")
+    else:
+        extension_id = supplied
     if not re.fullmatch(r"[a-p]{32}", extension_id):
         raise AppError("INVALID_CONFIGURATION", "Copy the 32-character extension ID from chrome://extensions and rerun Setup.")
     return extension_id
@@ -404,6 +461,7 @@ def install(extension_id_override=None):
         config.setdefault("storage", {}).pop("summary_dir", None)
         config.setdefault("service", {})
         config["service"]["extension_id"] = select_extension_id(config, extension_id_override)
+    selected_extension_id = config["service"]["extension_id"]
     legacy_original_dir = config.get("storage", {}).get("original_dir")
 
     print(f"Project Runtime: {paths.root}")
@@ -443,6 +501,9 @@ def install(extension_id_override=None):
     if config_source.resolve() != paths.auth.resolve() and config_source.is_file():
         config, migrated = migrate_legacy_configuration(config_source, paths.auth, paths)
         print("[OK] Existing engine configuration copied to Runtime and verified." if migrated else "[OK] Runtime configuration already exists.")
+    # The legacy migration copies its saved extension ID. The ID selected in this
+    # Setup run must win, even when the old configuration was copied first.
+    config.setdefault("service", {})["extension_id"] = selected_extension_id
     config["version"] = 2
     config.pop("language", None)
     config.pop("ai", None)
